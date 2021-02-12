@@ -1,5 +1,5 @@
 open System
-open System.Diagnostics;
+open System.Diagnostics
 open System.IO
 open System.IO.Compression
 open System.Xml.Linq
@@ -15,27 +15,36 @@ let rec exportRulesFromFolder(folder: XElement, modelName: string, modelSharedCo
         let implication = rule.Element(XName.Get "IMPLICATION").Value
 
         modelSharedCounters.[0] <- modelSharedCounters.[0] + 1
-        Directory.CreateDirectory(folderPath) |> ignore
+        Directory.CreateDirectory folderPath |> ignore
         File.WriteAllText($"{folderPath}/{modelSharedCounters.[0]}_{ruleName}.vbs", $"/*\nCondition: '{condition}'\n*/\n\n{implication}")
     )
 
 let exportModelFile(modelFileEntry: ZipArchiveEntry) =
+    use modelFileStream = modelFileEntry.Open()
+    let topClassElement = XDocument.Load(modelFileStream).Element(XName.Get "CLASS")
     let modelFileName = modelFileEntry.Name
-    let modelName = string modelFileName.[0] + modelFileName.Substring(1, modelFileName.IndexOf(',') - 1).ToLower()
-    let modelSharedCounters = [| 0 |]
+    let isInterface = topClassElement.Attribute(XName.Get "ISINTERFACE").Value = "true"
+    let nameUpperEnd = if isInterface then 2 else 1
+    let modelName = modelFileName.Substring(0, nameUpperEnd) + modelFileName.Substring(nameUpperEnd, modelFileName.IndexOf(',') - nameUpperEnd).ToLower()
 
     if Directory.Exists modelName then
         Directory.Delete(modelName, true)
 
+    Directory.CreateDirectory modelName |> ignore
     printfn $"Exporting model: {modelName}"
 
-    use modelFileStream = modelFileEntry.Open()
-    XDocument.Load(modelFileStream)
-             .Element(XName.Get "CLASS")
-             .Element(XName.Get "RULES")
-             .Elements(XName.Get "RULES") |> Seq.iter(fun k -> exportRulesFromFolder(k, modelName, modelSharedCounters))
+    let modelSharedCounters = [| 0 |]
+    let propertiesElement = topClassElement.Element(XName.Get "PROPERTIES").ToString()
+    let referencesElement = topClassElement.Element(XName.Get "REFERENCES").ToString()
+
+    File.WriteAllText($"{modelName}/Structure.xml", propertiesElement + "\n" + referencesElement);
+
+    if not isInterface then
+        topClassElement.Element(XName.Get "RULES")
+                       .Elements(XName.Get "RULES") |> Seq.iter(fun k -> exportRulesFromFolder(k, modelName, modelSharedCounters))
 
 
+printfn "Exporter version: 1.1.0"
 match Directory.GetFiles "." |> Seq.tryFind(fun k -> k.EndsWith ".zip") with
     | None -> printfn "No input .zip file found in current folder!"
     | Some inputZipFile ->
@@ -43,16 +52,17 @@ match Directory.GetFiles "." |> Seq.tryFind(fun k -> k.EndsWith ".zip") with
         printfn "Enter commit message!"
 
         let commitMessage = Console.ReadLine()
-        use zipFile = ZipFile.OpenRead(inputZipFile)
+        let zipFile = ZipFile.OpenRead(inputZipFile)
 
-        zipFile.Entries |> Seq.filter(fun k -> k.Name.EndsWith(".xml") && k.Name.[0] <> 'I')
+        zipFile.Entries |> Seq.filter(fun k -> k.Name.EndsWith(".xml"))
                         |> Seq.iter(exportModelFile)
 
+        zipFile.Dispose()
         File.Delete(inputZipFile)
 
-        printfn "Publishing to GitHub"
-        Process.Start("cmd.exe", $"/c \"git config --global core.autocrlf true && git add -A 2>nul && git commit -m \"{commitMessage}\" 2>nul && git push origin master 2>nul\"")
+        printfn "\nPublishing to GitHub"
+        Process.Start("cmd.exe", $"/c \"git reset && git add -A 2>nul && git commit -m \"{commitMessage}\" 2>nul && git push origin master 2>nul\"")
                .WaitForExit()
 
-printfn "\nDone! Press enter to exit"
+printfn "Done! Press enter to exit"
 Console.Read() |> ignore
