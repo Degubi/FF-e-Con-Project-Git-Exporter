@@ -2,6 +2,7 @@ open System
 open System.Diagnostics
 open System.IO
 open System.IO.Compression
+open System.Reflection
 open System.Xml.Linq
 
 let rec exportRulesFromFolder(folder: XElement, modelName: string, modelSharedCounters: int[]) =
@@ -44,7 +45,7 @@ let exportModelFile(modelFileEntry: ZipArchiveEntry) =
                        .Elements(XName.Get "RULES") |> Seq.iter(fun k -> exportRulesFromFolder(k, modelName, modelSharedCounters))
 
 
-printfn "Exporter version: 1.1.0"
+printfn $"Exporter version: {Assembly.GetEntryAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion}"
 match Directory.GetFiles "." |> Seq.tryFind(fun k -> k.EndsWith ".zip") with
     | None -> printfn "No input .zip file found in current folder!"
     | Some inputZipFile ->

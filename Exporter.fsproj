@@ -1,7 +1,18 @@
 ﻿<Project Sdk = "Microsoft.NET.Sdk">
     <PropertyGroup>
+        <Authors>Degubi</Authors>
+        <Description>E-Con Project Exporter and Publisher</Description>
+        <Company>Degubi</Company>
+        <Version>1.2.0</Version>
         <OutputType>Exe</OutputType>
         <TargetFramework>netcoreapp3.1</TargetFramework>
+        <SelfContained>false</SelfContained>
+        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+        <DebugSymbols>false</DebugSymbols>
+        <DebugType>none</DebugType>
+        <PublishSingleFile>true</PublishSingleFile>
+        <Optimization>true</Optimization>
+        <Configuration>Release</Configuration>
     </PropertyGroup>
     <ItemGroup>
         <Compile Include = "Main.fs"/>
