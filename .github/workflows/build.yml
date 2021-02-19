@@ -5,7 +5,7 @@ on:
     types: [created]
 
 jobs:
-  build:
+  build_dynamic:
     runs-on: windows-latest
 
     steps:
@@ -15,11 +15,30 @@ jobs:
       with:
         dotnet-version: '5.0.x'
     - name: Build App
-      run: dotnet publish --output .
+      run: dotnet publish --self-contained false --output .
     - name: Upload binary to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: Exporter.exe
         asset_name: Exporter.exe
+        tag: ${{ github.ref }}
+
+  build_static:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.0.x'
+    - name: Build App
+      run: dotnet publish -p:PublishTrimmed=true --self-contained true --output .
+    - name: Upload binary to release
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: Exporter.exe
+        asset_name: Exporter_static.exe
         tag: ${{ github.ref }}
