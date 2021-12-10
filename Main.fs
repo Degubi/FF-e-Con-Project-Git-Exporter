@@ -1,69 +1,62 @@
-open System
-open System.Diagnostics
 open System.IO
 open System.IO.Compression
-open System.Reflection
+open System.Text.RegularExpressions
 open System.Xml.Linq
 
-let rec exportRulesFromFolder(folder: XElement, modelName: string, modelSharedCounters: int[]) =
+let folderCharactersRegex = Regex(",|\.")
+let xn n = XName.Get n
+
+let exportRule(rule: XElement, folderPath: string) =
+    let ruleName = rule.Attribute(xn"LABEL").Value.Replace('/', '_')
+    let condition = rule.Element(xn"CONDITION").Value
+    let implication = rule.Element(xn"IMPLICATION").Value
+
+    File.WriteAllText($"{folderPath}/{ruleName}.vbs", $"/*\nCondition: '{condition}'\n*/\n\n{implication}")
+
+let rec exportRulesFromFolder(folder: XElement, modelName: string, outputPath: string) =
     let folderName = folder.Attribute(XName.Get "LABEL").Value
-    let folderPath = $"{modelName}/{folderName}"
+    let folderPath = $"{outputPath}/{modelName}/{folderName}"
 
-    folder.Elements(XName.Get "RULES") |> Seq.iter(fun k -> exportRulesFromFolder(k, $"{modelName}/{folderName}", modelSharedCounters))
-    folder.Elements(XName.Get "RULE") |> Seq.iter(fun rule ->
-        let ruleName = rule.Attribute(XName.Get "LABEL").Value.Replace('/', '_')
-        let condition = rule.Element(XName.Get "CONDITION").Value
-        let implication = rule.Element(XName.Get "IMPLICATION").Value
+    Directory.CreateDirectory folderPath |> ignore
 
-        modelSharedCounters.[0] <- modelSharedCounters.[0] + 1
-        Directory.CreateDirectory folderPath |> ignore
-        File.WriteAllText($"{folderPath}/{modelSharedCounters.[0]}_{ruleName}.vbs", $"/*\nCondition: '{condition}'\n*/\n\n{implication}")
-    )
+    folder.Elements(xn"RULES") |> Seq.iter(fun k -> exportRulesFromFolder(k, $"{modelName}/{folderName}", outputPath))
+    folder.Elements(xn"RULE")  |> Seq.iter(fun k -> exportRule(k, folderPath))
 
-let exportModelFile(modelFileEntry: ZipArchiveEntry) =
-    use modelFileStream = modelFileEntry.Open()
-    let topClassElement = XDocument.Load(modelFileStream).Element(XName.Get "CLASS")
-    let modelFileName = modelFileEntry.Name
-    let isInterface = topClassElement.Attribute(XName.Get "ISINTERFACE").Value = "true"
-    let nameUpperEnd = if isInterface then 2 else 1
-    let modelName = modelFileName.Substring(0, nameUpperEnd) + modelFileName.Substring(nameUpperEnd, modelFileName.IndexOf(',') - nameUpperEnd).ToLower()
+let exportModelFile(inputFileName: string, modelFileStream: Stream, outputPath: string) =
+    let topClassElement = XDocument.Load(modelFileStream).Element(xn"CLASS")
 
-    if Directory.Exists modelName then
-        Directory.Delete(modelName, true)
+    if topClassElement.Attribute(xn"ISINTERFACE").Value = "false" then
+        let modelName = Path.GetFileNameWithoutExtension(inputFileName) |> fun k -> folderCharactersRegex.Replace(k, "_")
+        let outputDir = $"{outputPath}/{modelName}";
 
-    Directory.CreateDirectory modelName |> ignore
-    printfn $"Exporting model: {modelName}"
+        Directory.CreateDirectory(outputDir) |> ignore
+        printfn $"Exporting model: {modelName}"
 
-    let modelSharedCounters = [| 0 |]
-    let propertiesElement = topClassElement.Element(XName.Get "PROPERTIES").ToString()
-    let referencesElement = topClassElement.Element(XName.Get "REFERENCES").ToString()
+        topClassElement.Element(xn"RULES")
+                       .Elements(xn"RULES") |> Seq.iter(fun k -> exportRulesFromFolder(k, modelName, outputPath))
 
-    File.WriteAllText($"{modelName}/Structure.xml", propertiesElement + "\n" + referencesElement);
+    modelFileStream.Dispose()
 
-    if not isInterface then
-        topClassElement.Element(XName.Get "RULES")
-                       .Elements(XName.Get "RULES") |> Seq.iter(fun k -> exportRulesFromFolder(k, modelName, modelSharedCounters))
+[<EntryPoint>]
+let main args =
+    let inputFile = args.[0]
 
+    if not <| File.Exists(inputFile) then
+        printfn "Input file doesn't exist: '%s'" inputFile
+        1
+    else
+        let outputPath = args.[1]
+        let inputFileExtension = Path.GetExtension(inputFile)
 
-printfn $"Exporter version: {Assembly.GetEntryAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion}"
-match Directory.GetFiles "." |> Seq.tryFind(fun k -> k.EndsWith ".zip") with
-    | None -> printfn "No input .zip file found in current folder!"
-    | Some inputZipFile ->
-        printfn $"Using zip file: '{inputZipFile |> Path.GetFileName}'\n"
-        printfn "Enter commit message!"
+        if inputFileExtension = ".zip" then
+            use zipFile = ZipFile.OpenRead(inputFile)
 
-        let commitMessage = Console.ReadLine()
-        let zipFile = ZipFile.OpenRead(inputZipFile)
-
-        zipFile.Entries |> Seq.filter(fun k -> k.Name.EndsWith(".xml"))
-                        |> Seq.iter(exportModelFile)
-
-        zipFile.Dispose()
-        File.Delete(inputZipFile)
-
-        printfn "\nPublishing to GitHub"
-        Process.Start("cmd.exe", $"/c \"git reset && git add -A 2>nul && git commit -m \"{commitMessage}\" 2>nul && git push origin master 2>nul\"")
-               .WaitForExit()
-
-printfn "Done! Press enter to exit"
-Console.Read() |> ignore
+            zipFile.Entries |> Seq.filter(fun k -> k.Name.EndsWith(".xml"))
+                            |> Seq.iter(fun k -> exportModelFile(k.Name, k.Open(), outputPath))
+            0
+        elif inputFileExtension = ".xml" then
+            exportModelFile(inputFile, File.OpenRead(inputFile), outputPath)
+            0
+        else
+            printfn "Unknown input file extension received: '%s', input file: '%s'" inputFileExtension inputFile
+            1

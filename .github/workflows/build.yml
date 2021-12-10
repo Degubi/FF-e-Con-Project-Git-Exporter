@@ -20,8 +20,8 @@ jobs:
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: Exporter.exe
-        asset_name: Exporter.exe
+        file: RulesExporter.exe
+        asset_name: E-ConRulesExporter.exe
         tag: ${{ github.ref }}
 
   build_static:
@@ -39,6 +39,6 @@ jobs:
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: Exporter.exe
-        asset_name: Exporter_static.exe
+        file: RulesExporter.exe
+        asset_name: E-ConRulesExporter_static.exe
         tag: ${{ github.ref }}

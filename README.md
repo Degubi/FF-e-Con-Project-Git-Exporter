@@ -1,13 +1,10 @@
-# First Usage:
-- Setup git (check git setup down below)
-- Download the latest release .exe and place it in the repository's root folder
-- Place the project export zip into the repository folder
-- Run the application, when prompted enter a commit message, then press enter
-- The application then proceeds and exports each rule into it's separate rule file into it's own model folder, and then publishes it using git
+# Rules exporter
+- This application takes as an E-Con Studio project .zip or an E-Con Studio model .xml file as input
+- As output it generates separate files for rules
 
-# Git Setup:
-- git config --global credential.helper cache
-- git config --global user.name "{UserName}"
-- git config --global user.email "{E-Mail}"
-- git config --global core.autocrlf true
-- Then create a repository e.g on Github, clone it using git clone
+# Usage
+- Download either the self contained(doesn't need .NET installed) or the normal application .exe file
+- Run the application from the command line: 'E-ConRulesExporter "projectZipOrModelXML" "outputFolder"'
+- The first argument is the input file: This can be either a project zip export or a model XML file
+- The second argument is the output directory
+- e.g: E-ConRulesExporter ProjectExport.zip export_out
