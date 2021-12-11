@@ -7,4 +7,4 @@
 - Run the application from the command line: 'E-ConRulesExporter "projectZipOrModelXML" "outputFolder"'
 - The first argument is the input file: This can be either a project zip export or a model XML file
 - The second argument is the output directory
-- e.g: E-ConRulesExporter ProjectExport.zip export_out
+- e.g: 'E-ConRulesExporter ProjectExport.zip export_out'
